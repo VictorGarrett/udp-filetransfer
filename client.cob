@@ -4,7 +4,7 @@
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
-           SELECT RECEIVED-FILE ASSIGN TO RECIEVED-FILE-NAME
+           SELECT RECEIVED-FILE ASSIGN TO RECEIVED-FILE-NAME
            ORGANIZATION IS SEQUENTIAL.
            SELECT FAILED-BLOCKS-FILE ASSIGN TO "tchurus.bangos"
            ORGANIZATION IS SEQUENTIAL.
@@ -22,7 +22,7 @@
 
        WORKING-STORAGE SECTION.
        
-       01  RECIEVED-FILE-NAME PIC X(20).
+       01  RECEIVED-FILE-NAME PIC X(20).
       *socket creation
        01 SOCKET-NAMESPACE BINARY-LONG VALUE 2.
        01 SOCKET-STYLE BINARY-LONG VALUE 2.
@@ -54,7 +54,7 @@
             03  SIN-ZERO BINARY-CHAR OCCURS 8.
        
 
-       01  REQUEST-MSG PIC X(128) VALUE "GET/ input.txt".
+       01  REQUEST-MSG PIC X(128) VALUE "GET/input2.txt".
        01  RECEIVED-MSG.
            03  BLOCK-INDEX BINARY-DOUBLE.
            03  TOTAL-BLOCKS BINARY-DOUBLE. 
@@ -108,6 +108,9 @@
            END-CALL
 
            DISPLAY "sent: " RETURN-CODE
+               
+           MOVE "recv.txt" TO RECEIVED-FILE-NAME.
+           OPEN OUTPUT RECEIVED-FILE.
 
            DISPLAY "Trying to recv"
 
@@ -116,18 +119,23 @@
                BY REFERENCE RECEIVED-MSG
                BY VALUE LENGTH OF RECEIVED-MSG
                BY VALUE 0
-           END-CALL
+           END-CALL.
 
            PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
                ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
-           END-PERFORM
+           END-PERFORM.
                
-           DISPLAY "RECEIVED:" RECEIVED-MSG-DATA
+
+           
+           DISPLAY "RECEIVED:" RECEIVED-MSG-DATA.
+           
            DISPLAY CALCULATED-CHECKSUM CHECKSUM
            IF CALCULATED-CHECKSUM = CHECKSUM
-               DISPLAY "CHECKSUM IS CORRECT" 
+               DISPLAY "CHECKSUM IS CORRECT"
+               MOVE RECEIVED-MSG-DATA TO FILE-PART
+               WRITE FILE-PART 
            END-IF
-
+           
            SUBTRACT 1 FROM TOTAL-BLOCKS
            PERFORM TOTAL-BLOCKS TIMES
 
@@ -149,9 +157,13 @@
                DISPLAY CALCULATED-CHECKSUM CHECKSUM
                IF CALCULATED-CHECKSUM = CHECKSUM
                    DISPLAY "CHECKSUM IS CORRECT"
+                   MOVE RECEIVED-MSG-DATA TO FILE-PART
+                   WRITE FILE-PART
                END-IF
 
            END-PERFORM
+           
+           CLOSE RECEIVED-FILE.
 
            STOP RUN.
 

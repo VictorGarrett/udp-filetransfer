@@ -66,14 +66,6 @@
         
        PROCEDURE DIVISION.
            
-           MOVE "input2.txt" TO SELECTED-FILE-NAME.
-      *     PERFORM SEND-FILE.
-
-      *     READ INPUT-FILE INTO RESPONSE-MSG.
-      *     DISPLAY RESPONSE-MSG.
-
-           
-           
            CALL 'socket' USING
                BY VALUE SOCKET-NAMESPACE
                BY VALUE SOCKET-STYLE
@@ -119,18 +111,11 @@
            DISPLAY "FROM " IP OF CLIENT-SOCKET-ADDRESS   
 
            DISPLAY "recv msg: " MESSAGE-CONTENT
-           
-           PERFORM SEND-FILE
 
-           CALL "sendto" USING
-               BY VALUE SOCKET-DESCRIPTOR
-               BY REFERENCE RESPONSE-MSG
-               BY VALUE LENGTH OF RESPONSE-MSG
-               BY VALUE 0
-               BY REFERENCE CLIENT-SOCKET-ADDRESS
-               BY VALUE CLIENT-SOCKET-SIZE
-           END-CALL
-           DISPLAY "send: " RETURN-CODE
+           IF MESSAGE-CONTENT(1:4) = "GET/"
+               MOVE MESSAGE-CONTENT(5:) TO SELECTED-FILE-NAME
+               PERFORM SEND-FILE
+           END-IF
 
            STOP RUN.
 
