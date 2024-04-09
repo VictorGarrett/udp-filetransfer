@@ -15,7 +15,7 @@
        FILE SECTION.
            FD RECEIVED-FILE.
            01  FILE-PART.
-               03  ACTUAL-FILE-PART BINARY-SHORT OCCURS 50.
+               03  ACTUAL-FILE-PART BINARY-CHAR OCCURS 50.
 
            FD FAILED-BLOCKS-FILE.
            01 FAILED-BLOCK-NUM BINARY-LONG.
@@ -59,10 +59,12 @@
            03  BLOCK-INDEX BINARY-DOUBLE.
            03  TOTAL-BLOCKS BINARY-DOUBLE. 
            03  RECEIVED-MSG-DATA.
-               05  ACTUAL-RECEIVED-MSG BINARY-SHORT OCCURS 50.
+               05  ACTUAL-RECEIVED-MSG BINARY-CHAR OCCURS 50.
            03  CHECKSUM BINARY-DOUBLE.
 
        01  CALCULATED-CHECKSUM BINARY-DOUBLE.
+
+       01  I BINARY-LONG.
        
        PROCEDURE DIVISION.
            
@@ -116,6 +118,17 @@
                BY VALUE 0
            END-CALL
 
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
+               ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
+           END-PERFORM
+               
+           DISPLAY "RECEIVED:" RECEIVED-MSG-DATA
+           DISPLAY CALCULATED-CHECKSUM CHECKSUM
+           IF CALCULATED-CHECKSUM = CHECKSUM
+               DISPLAY "CHECKSUM IS CORRECT" 
+           END-IF
+
+           SUBTRACT 1 FROM TOTAL-BLOCKS
            PERFORM TOTAL-BLOCKS TIMES
 
                CALL "recv" USING
@@ -124,14 +137,21 @@
                    BY VALUE LENGTH OF RECEIVED-MSG
                    BY VALUE 0
                END-CALL
+               DISPLAY "recv status: " RETURN-CODE
                
+               MOVE 0 TO CALCULATED-CHECKSUM
 
+               PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
+                   ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
+               END-PERFORM
+               
+               DISPLAY "RECEIVED:" RECEIVED-MSG-DATA
+               DISPLAY CALCULATED-CHECKSUM CHECKSUM
+               IF CALCULATED-CHECKSUM = CHECKSUM
+                   DISPLAY "CHECKSUM IS CORRECT"
+               END-IF
 
            END-PERFORM
-
-           DISPLAY "recv: " RETURN-CODE   
-           DISPLAY "recv: " RECEIVED-MSG          
-
 
            STOP RUN.
 

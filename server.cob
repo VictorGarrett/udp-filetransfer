@@ -15,7 +15,7 @@
        FILE SECTION.
        FD INPUT-FILE.
        01  FILE-PART.
-       03  ACTUAL-FILE-PART BINARY-SHORT OCCURS 50.
+       03  ACTUAL-FILE-PART BINARY-CHAR OCCURS 50.
 
 
        WORKING-STORAGE SECTION.
@@ -59,13 +59,15 @@
            03  BLOCK-INDEX BINARY-DOUBLE.
            03  TOTAL-BLOCKS BINARY-DOUBLE. 
            03  RESPONSE-MSG-DATA.
-               05  ACTUAL-RESPONSE-MSG BINARY-SHORT OCCURS 50.
+               05  ACTUAL-RESPONSE-MSG BINARY-CHAR OCCURS 50.
            03  CHECKSUM BINARY-DOUBLE.
 
+       01  I BINARY-LONG.
+        
        PROCEDURE DIVISION.
            
            MOVE "input2.txt" TO SELECTED-FILE-NAME.
-           PERFORM SEND-FILE.
+      *     PERFORM SEND-FILE.
 
       *     READ INPUT-FILE INTO RESPONSE-MSG.
       *     DISPLAY RESPONSE-MSG.
@@ -117,12 +119,9 @@
            DISPLAY "FROM " IP OF CLIENT-SOCKET-ADDRESS   
 
            DISPLAY "recv msg: " MESSAGE-CONTENT
-
-
-           STRING RECEIVED-MSG DELIMITED BY SPACE
-                  ' IS CRINGE' DELIMITED BY SIZE
-                  INTO RESPONSE-MSG
            
+           PERFORM SEND-FILE
+
            CALL "sendto" USING
                BY VALUE SOCKET-DESCRIPTOR
                BY REFERENCE RESPONSE-MSG
@@ -150,8 +149,10 @@
            END-READ
            END-PERFORM.
 
-           MOVE 0 TO IS-EOF.
+           CLOSE INPUT-FILE.
 
+           MOVE 0 TO IS-EOF.
+           OPEN INPUT INPUT-FILE.
 
            MOVE 0 TO BLOCK-INDEX OF RESPONSE-MSG
            PERFORM UNTIL IS-EOF = 1
@@ -163,10 +164,10 @@
               MOVE 0 TO CHECKSUM
 
               PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
-                 ADD RESPONSE-MSG-DATA TO CHECKSUM
+                 ADD ACTUAL-RESPONSE-MSG(I) TO CHECKSUM
               END-PERFORM
 
-              
+              DISPLAY "SENDING: " RESPONSE-MSG-DATA
               CALL "sendto" USING
                 BY VALUE SOCKET-DESCRIPTOR
                 BY REFERENCE RESPONSE-MSG
