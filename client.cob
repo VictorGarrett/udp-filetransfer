@@ -42,7 +42,7 @@
        01 SERVER-SOCKET-ADDRESS.
             03  FAMILY BINARY-SHORT VALUE 2.
             03  PORT BINARY-SHORT VALUE 8080.
-            03  IP BINARY-LONG VALUE 0.
+            03  IP BINARY-DOUBLE VALUE 0.
             03  SIN-ZERO BINARY-CHAR OCCURS 8.
        01 SERVER-SOCKET-SIZE BINARY-LONG.
 
@@ -50,7 +50,7 @@
        01 CLIENT-SOCKET-ADDRESS.
             03  FAMILY BINARY-SHORT VALUE 2.
             03  PORT BINARY-SHORT VALUE 8080.
-            03  IP BINARY-LONG VALUE 0.
+            03  IP BINARY-DOUBLE VALUE 0.
             03  SIN-ZERO BINARY-CHAR OCCURS 8.
        
 
@@ -89,7 +89,7 @@
            PERFORM SET-SOCKET-TIMEOUT.
 
            CALL 'htons' USING
-               BY VALUE 8081
+               BY VALUE 8080
                GIVING PORT OF CLIENT-SOCKET-ADDRESS
            END-CALL
 

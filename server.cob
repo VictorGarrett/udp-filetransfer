@@ -40,13 +40,13 @@
        01 SOCKET-RECEIVE-ADDRESS.
             03  FAMILY BINARY-SHORT VALUE 2.
             03  PORT BINARY-SHORT VALUE 8080.
-            03  IP BINARY-LONG VALUE 0.
+            03  IP BINARY-DOUBLE VALUE 0.
             03  SIN-ZERO BINARY-CHAR OCCURS 8.
       *socket that has sent a message
        01 CLIENT-SOCKET-ADDRESS.
             03  FAMILY BINARY-SHORT VALUE 2.
             03  PORT BINARY-SHORT VALUE 8080.
-            03  IP BINARY-LONG VALUE 10.
+            03  IP BINARY-DOUBLE VALUE 10.
             03  SIN-ZERO BINARY-CHAR OCCURS 8.
        01 CLIENT-SOCKET-SIZE BINARY-LONG.
 
@@ -117,6 +117,7 @@
            DISPLAY "recv msg: " MESSAGE-CONTENT
 
            IF MESSAGE-CONTENT(1:4) = "GET/"
+               MOVE SPACES TO SELECTED-FILE-NAME
                MOVE MESSAGE-CONTENT(5:) TO SELECTED-FILE-NAME
                PERFORM SEND-FILE        
            END-IF
