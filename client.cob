@@ -73,6 +73,7 @@
        01  IS-EOF BINARY-SHORT VALUE 0.
 
        01  RECEIVE-SUCCESS BINARY-SHORT VALUE 0.
+       01  SERVER-IP-TEXT PIC XXXXXXXXXXXXXXXX.
        
        PROCEDURE DIVISION.
            
@@ -104,6 +105,17 @@
                BY VALUE 8080
                GIVING PORT OF SERVER-SOCKET-ADDRESS
            END-CALL
+
+           DISPLAY "TYPE SERVER IP"
+           ACCEPT SERVER-IP-TEXT
+
+           CALL 'inet_aton' using
+               BY REFERENCE SERVER-IP-TEXT
+               BY REFERENCE IP OF SERVER-SOCKET-ADDRESS
+           end-call
+
+           display "conversion: " IP OF SERVER-SOCKET-ADDRESS
+
 
            DISPLAY "TYPE FILENAME:"
            ACCEPT RECEIVED-FILE-NAME
