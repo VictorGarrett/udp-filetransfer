@@ -71,6 +71,8 @@
        01  FAILED-BLOCK-INDEX-STR PIC 99999999.
 
        01  IS-EOF BINARY-SHORT VALUE 0.
+
+       01  RECEIVE-SUCCESS BINARY-SHORT VALUE 0.
        
        PROCEDURE DIVISION.
            
@@ -153,11 +155,14 @@
            READ FAILED-BLOCKS-FILE INTO FAILED-BLOCK-INDEX
                AT END MOVE 1 TO IS-EOF
                NOT AT END
-                   OPEN OUTPUT RECEIVED-FILE
-                   PERFORM REQUEST-FAILED
-                   MOVE FAILED-BLOCK-INDEX TO WAITED-BLOCK-INDEX
-                   PERFORM RECEIVE-FAILED-BLOCK
-                   CLOSE RECEIVED-FILE
+                   MOVE 0 TO RECEIVE-SUCCESS
+                   PERFORM UNTIL RECEIVE-SUCCESS = 1
+                       OPEN I-O RECEIVED-FILE
+                       PERFORM REQUEST-FAILED
+                       MOVE FAILED-BLOCK-INDEX TO WAITED-BLOCK-INDEX
+                       PERFORM RECEIVE-FAILED-BLOCK
+                       CLOSE RECEIVED-FILE
+                   END-PERFORM
            END-READ
            END-PERFORM.
 
@@ -269,6 +274,11 @@
 
            
            DISPLAY "RECEIVED:" RECEIVED-MSG-DATA.
+
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I > WAITED-BLOCK-INDEX
+               READ RECEIVED-FILE
+               display "advancing"
+           END-PERFORM.
            
            DISPLAY CALCULATED-CHECKSUM CHECKSUM.
            IF CALCULATED-CHECKSUM = CHECKSUM AND BLOCK-INDEX = WAITED-BL
@@ -276,13 +286,9 @@
                DISPLAY "CHECKSUM IS CORRECT"
                MOVE RECEIVED-MSG-DATA TO FILE-PART
                SUBTRACT 1 FROM FAILED-BLOCK-INDEX
-               WRITE FILE-PART AFTER FAILED-BLOCK-INDEX
+               REWRITE FILE-PART
                ADD 1 TO FAILED-BLOCK-INDEX
-            
+               MOVE 1 TO RECEIVE-SUCCESS
            ELSE
-               MOVE SPACES TO FILE-PART
-               WRITE FILE-PART
-               DISPLAY "WRITE " WAITED-BLOCK-INDEX
-               MOVE WAITED-BLOCK-INDEX TO FAILED-BLOCK-NUM
-               WRITE FAILED-BLOCK-NUM
+               MOVE 0 TO RECEIVE-SUCCESS
            END-IF.
