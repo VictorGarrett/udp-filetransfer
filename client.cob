@@ -6,7 +6,7 @@
        FILE-CONTROL.
            SELECT RECEIVED-FILE ASSIGN TO RECEIVED-FILE-NAME
            ORGANIZATION IS SEQUENTIAL.
-           SELECT FAILED-BLOCKS-FILE ASSIGN TO "tchurus.bangos"
+           SELECT FAILED-BLOCKS-FILE ASSIGN TO "tchurus.bin"
            ORGANIZATION IS SEQUENTIAL.
 
 
@@ -18,7 +18,7 @@
                03  ACTUAL-FILE-PART BINARY-CHAR OCCURS 50.
 
            FD FAILED-BLOCKS-FILE.
-           01 FAILED-BLOCK-NUM BINARY-LONG.
+           01 FAILED-BLOCK-NUM PIC 99999999.
 
        WORKING-STORAGE SECTION.
        
@@ -54,7 +54,7 @@
             03  SIN-ZERO BINARY-CHAR OCCURS 8.
        
 
-       01  REQUEST-MSG PIC X(128) VALUE "GET/input2.txt".
+       01  REQUEST-MSG PIC X(128).
        01  RECEIVED-MSG.
            03  BLOCK-INDEX BINARY-DOUBLE.
            03  TOTAL-BLOCKS BINARY-DOUBLE. 
@@ -65,6 +65,12 @@
        01  CALCULATED-CHECKSUM BINARY-DOUBLE.
 
        01  I BINARY-LONG.
+       01  WAITED-BLOCK-INDEX BINARY-LONG.
+
+       01  FAILED-BLOCK-INDEX BINARY-LONG.
+       01  FAILED-BLOCK-INDEX-STR PIC 99999999.
+
+       01  IS-EOF BINARY-SHORT VALUE 0.
        
        PROCEDURE DIVISION.
            
@@ -97,7 +103,15 @@
                GIVING PORT OF SERVER-SOCKET-ADDRESS
            END-CALL
 
-               
+           DISPLAY "TYPE FILENAME:"
+           ACCEPT RECEIVED-FILE-NAME
+
+           STRING "GET/" DELIMITED BY SIZE, 
+           RECEIVED-FILE-NAME DELIMITED BY SIZE 
+           INTO REQUEST-MSG. 
+
+           DISPLAY REQUEST-MSG
+
            CALL "sendto" USING
                BY VALUE SOCKET-DESCRIPTOR
                BY REFERENCE REQUEST-MSG
@@ -108,62 +122,47 @@
            END-CALL
 
            DISPLAY "sent: " RETURN-CODE
-               
-           MOVE "recv.txt" TO RECEIVED-FILE-NAME.
+
+           STRING "received" DELIMITED BY SPACE, 
+           REQUEST-MSG(5:) DELIMITED BY SPACE 
+           INTO RECEIVED-FILE-NAME. 
+
            OPEN OUTPUT RECEIVED-FILE.
+           OPEN OUTPUT FAILED-BLOCKS-FILE.
 
            DISPLAY "Trying to recv"
-
-           CALL "recv" USING
-               BY VALUE SOCKET-DESCRIPTOR
-               BY REFERENCE RECEIVED-MSG
-               BY VALUE LENGTH OF RECEIVED-MSG
-               BY VALUE 0
-           END-CALL.
-
-           PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
-               ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
-           END-PERFORM.
-               
-
            
-           DISPLAY "RECEIVED:" RECEIVED-MSG-DATA.
-           
-           DISPLAY CALCULATED-CHECKSUM CHECKSUM
-           IF CALCULATED-CHECKSUM = CHECKSUM
-               DISPLAY "CHECKSUM IS CORRECT"
-               MOVE RECEIVED-MSG-DATA TO FILE-PART
-               WRITE FILE-PART 
-           END-IF
+           MOVE 1 TO WAITED-BLOCK-INDEX
+           PERFORM RECEIVE-BLOCK.
            
            SUBTRACT 1 FROM TOTAL-BLOCKS
            PERFORM TOTAL-BLOCKS TIMES
-
-               CALL "recv" USING
-                   BY VALUE SOCKET-DESCRIPTOR
-                   BY REFERENCE RECEIVED-MSG
-                   BY VALUE LENGTH OF RECEIVED-MSG
-                   BY VALUE 0
-               END-CALL
-               DISPLAY "recv status: " RETURN-CODE
-               
-               MOVE 0 TO CALCULATED-CHECKSUM
-
-               PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
-                   ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
-               END-PERFORM
-               
-               DISPLAY "RECEIVED:" RECEIVED-MSG-DATA
-               DISPLAY CALCULATED-CHECKSUM CHECKSUM
-               IF CALCULATED-CHECKSUM = CHECKSUM
-                   DISPLAY "CHECKSUM IS CORRECT"
-                   MOVE RECEIVED-MSG-DATA TO FILE-PART
-                   WRITE FILE-PART
-               END-IF
-
-           END-PERFORM
+               ADD 1 TO WAITED-BLOCK-INDEX
+               PERFORM RECEIVE-BLOCK
+           END-PERFORM.
            
            CLOSE RECEIVED-FILE.
+           CLOSE FAILED-BLOCKS-FILE.
+           
+      *     STOP RUN.
+           
+           OPEN I-O FAILED-BLOCKS-FILE.
+
+           PERFORM UNTIL IS-EOF = 1
+           MOVE 0 TO FAILED-BLOCK-INDEX
+           READ FAILED-BLOCKS-FILE INTO FAILED-BLOCK-INDEX
+               AT END MOVE 1 TO IS-EOF
+               NOT AT END
+                   OPEN OUTPUT RECEIVED-FILE
+                   PERFORM REQUEST-FAILED
+                   MOVE FAILED-BLOCK-INDEX TO WAITED-BLOCK-INDEX
+                   PERFORM RECEIVE-FAILED-BLOCK
+                   CLOSE RECEIVED-FILE
+           END-READ
+           END-PERFORM.
+
+           
+           CLOSE FAILED-BLOCKS-FILE.
 
            STOP RUN.
 
@@ -199,3 +198,91 @@
                BY VALUE LENGTH OF SOCKET-OPTION-VALUE-TIMEVAL
            END-CALL
            DISPLAY "sockopt timeout: " RETURN-CODE.
+
+
+           RECEIVE-BLOCK.
+
+           CALL "recv" USING
+               BY VALUE SOCKET-DESCRIPTOR
+               BY REFERENCE RECEIVED-MSG
+               BY VALUE LENGTH OF RECEIVED-MSG
+               BY VALUE 0
+           END-CALL.
+           
+           MOVE 0 TO CALCULATED-CHECKSUM.
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
+               ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
+           END-PERFORM.
+               
+
+           
+           DISPLAY "RECEIVED:" RECEIVED-MSG-DATA.
+           
+           DISPLAY CALCULATED-CHECKSUM CHECKSUM.
+           IF CALCULATED-CHECKSUM = CHECKSUM AND BLOCK-INDEX = WAITED-BL
+      -    OCK-INDEX
+               DISPLAY "CHECKSUM IS CORRECT"
+               MOVE RECEIVED-MSG-DATA TO FILE-PART
+               WRITE FILE-PART
+           ELSE
+               MOVE SPACES TO FILE-PART
+               WRITE FILE-PART
+               DISPLAY "WRITE " WAITED-BLOCK-INDEX
+               MOVE WAITED-BLOCK-INDEX TO FAILED-BLOCK-NUM
+               WRITE FAILED-BLOCK-NUM
+           END-IF.
+
+           REQUEST-FAILED.
+               
+           MOVE SPACES TO REQUEST-MSG
+           MOVE FAILED-BLOCK-INDEX TO FAILED-BLOCK-INDEX-STR
+           STRING "SUS/" DELIMITED BY SIZE, 
+           FAILED-BLOCK-INDEX-STR DELIMITED BY SIZE 
+           INTO REQUEST-MSG. 
+    
+           DISPLAY "SUS rque".
+           DISPLAY REQUEST-MSG.
+    
+           CALL "sendto" USING
+               BY VALUE SOCKET-DESCRIPTOR
+               BY REFERENCE REQUEST-MSG
+               BY VALUE LENGTH OF REQUEST-MSG
+               BY VALUE 0
+               BY REFERENCE SERVER-SOCKET-ADDRESS
+               BY VALUE LENGTH OF SERVER-SOCKET-ADDRESS
+           END-CALL.
+
+           RECEIVE-FAILED-BLOCK.
+
+           CALL "recv" USING
+               BY VALUE SOCKET-DESCRIPTOR
+               BY REFERENCE RECEIVED-MSG
+               BY VALUE LENGTH OF RECEIVED-MSG
+               BY VALUE 0
+           END-CALL.
+           
+           MOVE 0 TO CALCULATED-CHECKSUM.
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
+               ADD ACTUAL-RECEIVED-MSG(I) TO CALCULATED-CHECKSUM
+           END-PERFORM.
+               
+
+           
+           DISPLAY "RECEIVED:" RECEIVED-MSG-DATA.
+           
+           DISPLAY CALCULATED-CHECKSUM CHECKSUM.
+           IF CALCULATED-CHECKSUM = CHECKSUM AND BLOCK-INDEX = WAITED-BL
+      -    OCK-INDEX
+               DISPLAY "CHECKSUM IS CORRECT"
+               MOVE RECEIVED-MSG-DATA TO FILE-PART
+               SUBTRACT 1 FROM FAILED-BLOCK-INDEX
+               WRITE FILE-PART AFTER FAILED-BLOCK-INDEX
+               ADD 1 TO FAILED-BLOCK-INDEX
+            
+           ELSE
+               MOVE SPACES TO FILE-PART
+               WRITE FILE-PART
+               DISPLAY "WRITE " WAITED-BLOCK-INDEX
+               MOVE WAITED-BLOCK-INDEX TO FAILED-BLOCK-NUM
+               WRITE FAILED-BLOCK-NUM
+           END-IF.

@@ -62,6 +62,8 @@
                05  ACTUAL-RESPONSE-MSG BINARY-CHAR OCCURS 50.
            03  CHECKSUM BINARY-DOUBLE.
 
+
+       01  BLOCK-TO-RESEND BINARY-LONG.
        01  I BINARY-LONG.
         
        PROCEDURE DIVISION.
@@ -96,6 +98,8 @@
 
            DISPLAY "bind: " RETURN-CODE
 
+
+           PERFORM UNTIL EXIT
            MOVE SPACES TO RECEIVED-MSG
 
            MOVE LENGTH OF CLIENT-SOCKET-ADDRESS TO CLIENT-SOCKET-SIZE
@@ -114,9 +118,14 @@
 
            IF MESSAGE-CONTENT(1:4) = "GET/"
                MOVE MESSAGE-CONTENT(5:) TO SELECTED-FILE-NAME
-               PERFORM SEND-FILE
+               PERFORM SEND-FILE        
            END-IF
 
+           IF  MESSAGE-CONTENT(1:4) = "SUS/"
+               MOVE MESSAGE-CONTENT(5:) TO BLOCK-TO-RESEND
+               PERFORM RESEND-FILE-BLOCK     
+           END-IF
+           END-PERFORM.
            STOP RUN.
 
 
@@ -139,7 +148,7 @@
            MOVE 0 TO IS-EOF.
            OPEN INPUT INPUT-FILE.
 
-           MOVE 0 TO BLOCK-INDEX OF RESPONSE-MSG
+           MOVE 1 TO BLOCK-INDEX OF RESPONSE-MSG
            PERFORM UNTIL IS-EOF = 1
            MOVE SPACES TO FILE-PART
            READ INPUT-FILE INTO RESPONSE-MSG-DATA OF RESPONSE-MSG
@@ -152,6 +161,12 @@
                  ADD ACTUAL-RESPONSE-MSG(I) TO CHECKSUM
               END-PERFORM
 
+              IF BLOCK-INDEX = 2
+                 MOVE 0 TO ACTUAL-RESPONSE-MSG(2)
+                 MOVE 1 TO ACTUAL-RESPONSE-MSG(3)
+                 MOVE 3 TO ACTUAL-RESPONSE-MSG(4)
+              END-IF
+
               DISPLAY "SENDING: " RESPONSE-MSG-DATA
               CALL "sendto" USING
                 BY VALUE SOCKET-DESCRIPTOR
@@ -161,6 +176,44 @@
                 BY REFERENCE CLIENT-SOCKET-ADDRESS
                 BY VALUE CLIENT-SOCKET-SIZE
               END-CALL
+              ADD 1 TO BLOCK-INDEX OF RESPONSE-MSG
+               
+           END-READ
+           END-PERFORM.
+           CLOSE INPUT-FILE.
+
+           RESEND-FILE-BLOCK. 
+
+           MOVE 0 TO IS-EOF.
+           OPEN INPUT INPUT-FILE.
+
+           MOVE 1 TO BLOCK-INDEX OF RESPONSE-MSG
+           PERFORM UNTIL IS-EOF = 1
+
+       
+           MOVE SPACES TO FILE-PART
+          
+           READ INPUT-FILE INTO RESPONSE-MSG-DATA OF RESPONSE-MSG
+              AT END MOVE 1 TO IS-EOF
+              NOT AT END
+
+              IF BLOCK-INDEX = BLOCK-TO-RESEND 
+                MOVE 0 TO CHECKSUM
+  
+                PERFORM VARYING I FROM 1 BY 1 UNTIL I > 50
+                   ADD ACTUAL-RESPONSE-MSG(I) TO CHECKSUM
+                END-PERFORM
+  
+                DISPLAY "SENDING: " RESPONSE-MSG-DATA
+                CALL "sendto" USING
+                  BY VALUE SOCKET-DESCRIPTOR
+                  BY REFERENCE RESPONSE-MSG
+                  BY VALUE LENGTH OF RESPONSE-MSG
+                  BY VALUE 0
+                  BY REFERENCE CLIENT-SOCKET-ADDRESS
+                  BY VALUE CLIENT-SOCKET-SIZE
+                END-CALL
+              END-IF
               ADD 1 TO BLOCK-INDEX OF RESPONSE-MSG
                
            END-READ
